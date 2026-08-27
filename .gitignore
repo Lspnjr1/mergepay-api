@@ -4,9 +4,12 @@ dist
 *.log
 coverage
 uploads/*
+temp_auto_push.bat
 !uploads/.gitkeep
 .DS_Store
 
 # Local Wave build scaffolding (task prompts, not product)
 01-labels-issues-api/
 02-hygiene-api/
+.gitignore
+branch_structure.json
