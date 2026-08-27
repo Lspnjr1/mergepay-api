@@ -75,6 +75,15 @@ export default async function expenseRoutes(app: FastifyInstance) {
       throw Errors.badRequest("invalid_split", e?.message ?? "Invalid split");
     }
 
+    const participantIds = [...new Set(computed.map((share) => share.userId))];
+    const members = await prisma.groupMember.findMany({
+      where: { groupId, userId: { in: participantIds } },
+      select: { userId: true },
+    });
+    if (members.length !== participantIds.length) {
+      throw Errors.badRequest("invalid_split", "Every split participant must be an active group member");
+    }
+
     const memo = body.memo?.trim() || shortCode().slice(0, 8);
 
     const expense = await prisma.$transaction(async (tx) => {
