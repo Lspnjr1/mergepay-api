@@ -10,6 +10,7 @@ import { shortCode } from "../services/codes";
 import { auditTx } from "../services/audit";
 import { validateAsset, validateAmount } from "../services/assets";
 import { serializeExpense } from "../serializers";
+import { createExpenseSchema, updateExpenseSchema } from "../validations/expense";
 import {
   buildPage,
   cursorFilter,
@@ -21,32 +22,6 @@ import {
 
 /** Every route in this file takes a single opaque resource id. */
 const idParamSchema = z.object({ id: z.string().min(1).max(64) });
-
-const shareInput = z.object({
-  userId: z.string(),
-  amount: z.string().optional(),
-  percent: z.number().optional(),
-});
-
-const createExpenseSchema = z.object({
-  title: z.string().min(1).max(80),
-  description: z.string().max(500).optional(),
-  amount: z.string().min(1),
-  assetCode: z.string().min(1).max(12),
-  assetIssuer: z.string().nullable().optional(),
-  splitType: z.enum(["equal", "custom", "percentage"]),
-  shares: z.array(shareInput).min(1),
-  payerUserId: z.string().optional(),
-  memo: z.string().max(24).optional(),
-  receiptUrl: z.string().nullable().optional(),
-});
-
-const updateExpenseSchema = z.object({
-  title: z.string().min(1).max(80).optional(),
-  description: z.string().max(500).nullable().optional(),
-  memo: z.string().max(24).optional(),
-  receiptUrl: z.string().nullable().optional(),
-});
 
 const expenseInclude = {
   payer: true,
