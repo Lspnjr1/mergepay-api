@@ -20,6 +20,7 @@ import {
   Transaction,
   TransactionBuilder,
 } from "@stellar/stellar-sdk";
+import pino from "pino";
 import { config } from "../config";
 import { Errors } from "../errors";
 import { validateAssetSpec, assetConfigToSpec } from "./assets";
@@ -31,6 +32,7 @@ import {
 } from "../lib/time-bounds";
 
 let _server: Horizon.Server | null = null;
+const log = pino({ name: "stellar" });
 function server(): Horizon.Server {
   if (!_server) _server = new Horizon.Server(config.HORIZON_URL);
   return _server;
@@ -344,7 +346,10 @@ export async function submitWithRetry(
         throw Errors.upstream(`Stellar rejected the transaction: ${detail}`);
       }
       const delayMs = Math.max(0, Math.round(baseDelayMs * 2 ** attempt * random()));
-      console.warn("[stellar] transient submission failure; retrying", { attempt: attempt + 1, delayMs, errorCode: error?.response?.status ?? error?.code ?? "transport" });
+      log.warn(
+        { attempt: attempt + 1, delayMs, errorCode: error?.response?.status ?? error?.code ?? "transport" },
+        "transient submission failure; retrying"
+      );
       await delay(delayMs);
     }
   }
