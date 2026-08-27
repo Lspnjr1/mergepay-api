@@ -33,10 +33,10 @@ function trustedProxySet(): Set<string> {
 /** Key by the authenticated user when available, otherwise by client IP. */
 export function userOrIpKey(prefix: string) {
   return (req: FastifyRequest): string => {
-    const userId = req.user?.id;
+    const userKey = req.user?.stellarPublicKey ?? req.user?.publicKey;
     const ip = normalizeIp(req.ip);
-    if (userId) {
-      return bound(`${prefix}:user:${userId}`);
+    if (userKey) {
+      return bound(`${prefix}:public-key:${userKey}`);
     }
     return bound(`${prefix}:ip:${ip}`);
   };
