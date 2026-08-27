@@ -153,7 +153,7 @@ async function buildPolicyApp(name: Parameters<typeof rateLimited>[0], max: numb
     },
     preHandler: async (request: any) => {
       const userId = request.headers["x-test-user"];
-      if (userId) request.user = { id: userId, stellarPublicKey: "GTEST" };
+      if (userId) request.user = { id: userId, stellarPublicKey: `GTEST_${userId}` };
     },
   };
 
