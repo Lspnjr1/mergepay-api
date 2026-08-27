@@ -50,6 +50,10 @@ async function deliver(
       responseBody: null,
       success: false,
       attempts: 0,
+      attemptCount: 0,
+      nextRetryAt: new Date(),
+      status: "pending",
+      lastError: null,
     },
   });
 
@@ -89,6 +93,10 @@ async function deliver(
             responseBody: lastResponseBody,
             success: true,
             attempts: attempt,
+            attemptCount: attempt,
+            nextRetryAt: null,
+            status: "delivered",
+            lastError: null,
           },
         });
         return;
@@ -101,6 +109,7 @@ async function deliver(
       clearTimeout(timeout);
     }
 
+    const exhausted = attempt === MAX_ATTEMPTS;
     await (prisma as any).webhookDelivery.update({
       where: { id: delivery.id },
       data: {
@@ -108,6 +117,10 @@ async function deliver(
         responseBody: lastResponseBody,
         success: false,
         attempts: attempt,
+        attemptCount: attempt,
+        nextRetryAt: exhausted ? null : new Date(Date.now() + RETRY_DELAYS_MS[attempt - 1]),
+        status: exhausted ? "failed" : "pending",
+        lastError: lastResponseBody,
       },
     });
   }

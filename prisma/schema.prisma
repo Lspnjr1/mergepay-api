@@ -28,6 +28,7 @@ model User {
   approvals        TreasuryApproval[]
   auditLogs        AuditLog[]
   idempotencyKeys  IdempotencyKey[]
+  webhooks         Webhook[]
 
   @@map("users")
 }
@@ -52,6 +53,7 @@ model Group {
   invites     Invite[]
   invitations Invitation[]
   auditLogs   AuditLog[]
+  webhooks    Webhook[]
 
   @@index([createdByUserId])
   @@map("groups")
@@ -71,6 +73,44 @@ model GroupMember {
   @@index([userId])
   @@index([groupId])
   @@map("group_members")
+}
+
+model Webhook {
+  id        String   @id @default(cuid())
+  groupId   String?  @map("groupId")
+  userId    String?  @map("userId")
+  url       String
+  secret    String
+  events    String[]
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deliveries WebhookDelivery[]
+  group Group? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([groupId])
+  @@index([userId])
+  @@map("Webhook")
+}
+
+model WebhookDelivery {
+  id                 String   @id @default(cuid())
+  webhookId          String
+  eventType          String
+  payload            Json
+  responseStatusCode Int?
+  responseBody       String?
+  success            Boolean  @default(false)
+  attempts           Int      @default(0)
+  attemptCount       Int      @default(0)
+  nextRetryAt        DateTime?
+  status             String   @default("pending")
+  lastError          String?
+  createdAt          DateTime @default(now())
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  @@index([webhookId, createdAt])
+  @@index([status, nextRetryAt])
+  @@map("WebhookDelivery")
 }
 
 model Expense {
