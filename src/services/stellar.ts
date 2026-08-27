@@ -239,8 +239,7 @@ export const stellar = {
   async submitSigned(signedXdr: string): Promise<string> {
     const tx = new Transaction(signedXdr, config.networkPassphrase);
     try {
-      const res = await server().submitTransaction(tx);
-      return res.hash;
+      return submitWithRetry(tx);
     } catch (e: any) {
       const codes =
         e?.response?.data?.extras?.result_codes ??
@@ -310,17 +309,49 @@ export function parseSignedPaymentXdr(
   return parsed;
 }
 
-async function submitToHorizon(tx: Transaction): Promise<string> {
-  try {
-    const res = await server().submitTransaction(tx);
-    return res.hash;
-  } catch (e: any) {
-    const codes =
-      e?.response?.data?.extras?.result_codes ??
-      e?.response?.data?.result_codes;
-    const detail = codes ? JSON.stringify(codes) : e?.message ?? "submit failed";
-    throw Errors.upstream(`Stellar rejected the transaction: ${detail}`);
+export interface HorizonRetryOptions {
+  maxRetries?: number;
+  baseDelayMs?: number;
+  random?: () => number;
+  delay?: (ms: number) => Promise<void>;
+}
+
+function isTransientSubmissionError(error: any): boolean {
+  const status = error?.response?.status ?? error?.statusCode;
+  if (typeof status === "number") return status === 429 || status >= 500;
+  const message = String(error?.message ?? error).toLowerCase();
+  return /timeout|timed out|socket|econnreset|econnrefused|enotfound|network/.test(message);
+}
+
+/** Submit with bounded full-jitter retries for transport/service failures only. */
+export async function submitWithRetry(
+  tx: Transaction,
+  options: HorizonRetryOptions = {}
+): Promise<string> {
+  const maxRetries = options.maxRetries ?? Number(process.env.HORIZON_SUBMIT_MAX_RETRIES ?? 3);
+  const baseDelayMs = options.baseDelayMs ?? Number(process.env.HORIZON_SUBMIT_RETRY_BASE_MS ?? 1_000);
+  const random = options.random ?? Math.random;
+  const delay = options.delay ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const res = await server().submitTransaction(tx);
+      return res.hash;
+    } catch (error: any) {
+      if (!isTransientSubmissionError(error) || attempt >= maxRetries) {
+        const codes = error?.response?.data?.extras?.result_codes ?? error?.response?.data?.result_codes;
+        const detail = codes ? JSON.stringify(codes) : error?.message ?? "submit failed";
+        throw Errors.upstream(`Stellar rejected the transaction: ${detail}`);
+      }
+      const delayMs = Math.max(0, Math.round(baseDelayMs * 2 ** attempt * random()));
+      console.warn("[stellar] transient submission failure; retrying", { attempt: attempt + 1, delayMs, errorCode: error?.response?.status ?? error?.code ?? "transport" });
+      await delay(delayMs);
+    }
   }
+}
+
+async function submitToHorizon(tx: Transaction): Promise<string> {
+  return submitWithRetry(tx);
 }
 
 /**
