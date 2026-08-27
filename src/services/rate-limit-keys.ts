@@ -1,9 +1,8 @@
 /**
  * Rate-limit key generators shared across routes.
  *
- * Keys are always bounded in length and never include a Stellar public key
- * or other wallet identifier — only Mergepay's internal (cuid) user id, or
- * the client's network address. `req.ip` is Fastify's own resolved address;
+ * Keys are always bounded in length and use the authenticated Stellar public
+ * key for user-scoped limits, or the client's network address. `req.ip` is Fastify's own resolved address;
  * it respects the `trustProxy` option configured on the Fastify server, which
  * should only be enabled when the operator populates TRUSTED_PROXY_IPS.
  */
@@ -33,7 +32,7 @@ function trustedProxySet(): Set<string> {
 /** Key by the authenticated user when available, otherwise by client IP. */
 export function userOrIpKey(prefix: string) {
   return (req: FastifyRequest): string => {
-    const userKey = req.user?.stellarPublicKey ?? req.user?.publicKey;
+    const userKey = req.user?.stellarPublicKey;
     const ip = normalizeIp(req.ip);
     if (userKey) {
       return bound(`${prefix}:public-key:${userKey}`);
