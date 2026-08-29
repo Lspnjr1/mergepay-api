@@ -300,7 +300,7 @@ describe("POST /settlements/:id/confirm — 20 req/min per user/IP", () => {
     const policy = rateLimitPolicies().settlementConfirm;
     app.addHook("preHandler", async (req) => {
       const userId = req.headers["x-test-user"] as string | undefined;
-      if (userId) (req as any).user = { id: userId, stellarPublicKey: "GTEST" };
+      if (userId) (req as any).user = { id: userId, stellarPublicKey: `GTEST_${userId}` };
     });
     await app.register(rateLimit, {
       max: 1,
