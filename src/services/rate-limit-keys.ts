@@ -32,7 +32,10 @@ function trustedProxySet(): Set<string> {
 /** Key by the authenticated user when available, otherwise by client IP. */
 export function userOrIpKey(prefix: string) {
   return (req: FastifyRequest): string => {
-    const userKey = req.user?.stellarPublicKey;
+    // Some authenticated request contexts expose the internal user id before
+    // the SEP-10 public key is attached. Treat either stable identity as a
+    // user-scoped bucket; falling back to IP must only happen anonymously.
+    const userKey = req.user?.stellarPublicKey ?? req.user?.id;
     const ip = normalizeIp(req.ip);
     if (userKey) {
       return bound(`${prefix}:public-key:${userKey}`);
