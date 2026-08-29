@@ -189,7 +189,7 @@ describe("per-route tiers", () => {
   it("runs proposal creation on preHandler so the user is resolved first", () => {
     // A `user-or-ip` policy on onRequest would key every request by IP,
     // because req.user is not populated until the authenticate hook runs.
-    expect(rateLimitPolicies().treasuryPropose.hook).toBe("preHandler");
+    expect(rateLimitPolicies().treasuryPropose.hook).toBe("preValidation");
   });
 });
 

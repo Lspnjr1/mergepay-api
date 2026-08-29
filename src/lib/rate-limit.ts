@@ -54,7 +54,7 @@ export interface RateLimitPolicy {
    * `user-or-ip` policies so the authenticated user is already resolved;
    * `onRequest` (the plugin default) rejects earlier and is used elsewhere.
    */
-  hook: "onRequest" | "preHandler";
+  hook: "onRequest" | "preValidation";
 }
 
 /**
@@ -89,42 +89,42 @@ export function rateLimitPolicies(): Record<RateLimitPolicyName, RateLimitPolicy
       timeWindow: config.RATE_LIMIT_SETTLEMENT_CREATE_WINDOW_MS,
       keyBy: "user-or-ip",
       prefix: "settlement.create",
-      hook: "preHandler",
+      hook: "preValidation",
     },
     settlementConfirm: {
       max: config.RATE_LIMIT_SETTLEMENT_CONFIRM_MAX,
       timeWindow: config.RATE_LIMIT_SETTLEMENT_CONFIRM_WINDOW_MS,
       keyBy: "user-or-ip",
       prefix: "settlement.confirm",
-      hook: "preHandler",
+      hook: "preValidation",
     },
     treasurySubmit: {
       max: config.RATE_LIMIT_TREASURY_SUBMIT_MAX,
       timeWindow: config.RATE_LIMIT_TREASURY_SUBMIT_WINDOW_MS,
       keyBy: "user-or-ip",
       prefix: "treasury.submit",
-      hook: "preHandler",
+      hook: "preValidation",
     },
     treasuryPropose: {
       max: config.RATE_LIMIT_TREASURY_PROPOSE_MAX,
       timeWindow: config.RATE_LIMIT_TREASURY_PROPOSE_WINDOW_MS,
       keyBy: "user-or-ip",
       prefix: "treasury.propose",
-      hook: "preHandler",
+      hook: "preValidation",
     },
     anchorInit: {
       max: config.RATE_LIMIT_ANCHOR_INIT_MAX,
       timeWindow: config.RATE_LIMIT_ANCHOR_INIT_WINDOW_MS,
       keyBy: "user-or-ip",
       prefix: "anchor.init",
-      hook: "preHandler",
+      hook: "preValidation",
     },
     anchorPoll: {
       max: config.RATE_LIMIT_ANCHOR_POLL_MAX,
       timeWindow: config.RATE_LIMIT_ANCHOR_POLL_WINDOW_MS,
       keyBy: "user-or-ip",
       prefix: "anchor.poll",
-      hook: "preHandler",
+      hook: "preValidation",
     },
     anchorWebhook: {
       max: config.RATE_LIMIT_ANCHOR_WEBHOOK_MAX,
@@ -138,14 +138,14 @@ export function rateLimitPolicies(): Record<RateLimitPolicyName, RateLimitPolicy
       timeWindow: config.RATE_LIMIT_WINDOW_MS,
       keyBy: "user-or-ip",
       prefix: "group.create",
-      hook: "preHandler",
+      hook: "preValidation",
     },
     history: {
       max: config.RATE_LIMIT_HISTORY,
       timeWindow: config.RATE_LIMIT_WINDOW_MS,
       keyBy: "user-or-ip",
       prefix: "history.read",
-      hook: "preHandler",
+      hook: "preValidation",
     },
   };
 }
