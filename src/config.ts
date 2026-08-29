@@ -37,9 +37,13 @@ const schema = z.object({
     errorMap: () => ({ message: "STELLAR_NETWORK must be either 'testnet' or 'public'" }),
   }),
   HORIZON_URL: urlSchema,
+  // Ordered, comma-separated Horizon endpoints. HORIZON_URL remains the
+  // backwards-compatible primary endpoint when this is not set.
+  HORIZON_URLS: z.string().optional(),
   
   // Fee configuration with sensible defaults
   FEE_CACHE_TTL: z.coerce.number().positive().default(30),
+  EXCHANGE_RATE_CACHE_TTL: z.coerce.number().positive().default(300),
   MAX_FEE_STROOPS: z.coerce.number().int().positive().default(1000),
   DEFAULT_FEE_STROOPS: z.coerce.number().int().positive().default(100),
   
@@ -53,16 +57,35 @@ const schema = z.object({
   ANCHOR_HOME_DOMAIN: z.string().min(1, "ANCHOR_HOME_DOMAIN is required"),
   ANCHOR_NAME: z.string().min(1, "ANCHOR_NAME is required"),
   ANCHOR_WEBHOOK_SECRET: z.string().min(1, "ANCHOR_WEBHOOK_SECRET is required"),
-  
+  // Per-anchor HMAC signing secrets for SEP-24 callbacks, as
+  // "anchorName:secret,anchorName:secret". Deployments serving a single anchor
+  // leave this empty and ANCHOR_WEBHOOK_SECRET is used for every callback.
+  SEP24_WEBHOOK_SECRETS: z.string().default(""),
+  // How far a SEP-24 callback's signing timestamp may be from the server clock
+  // before the signature is treated as a replay. Only enforced for anchors that
+  // send a timestamp header.
+  SEP24_WEBHOOK_TOLERANCE_MS: z.coerce.number().int().positive().default(300000),
+
   // Stable asset configuration
   STABLE_ASSET_CODE: z.string().min(1, "STABLE_ASSET_CODE is required"),
   STABLE_ASSET_ISSUER: stellarPublicKeySchema,
   
-  // File storage
+  // File storage and request limits. See src/lib/request-limits.ts for how each
+  // of these is enforced and what a client is told when one trips.
   UPLOADS_DIR: z.string().default("./uploads"),
   JSON_BODY_LIMIT_BYTES: z.coerce.number().int().positive().default(1024 * 1024),
   MULTIPART_MAX_FILES: z.coerce.number().int().positive().default(1),
+  // Total multipart parts (fields + files) accepted in one request.
   MULTIPART_MAX_FIELDS: z.coerce.number().int().positive().default(20),
+  // Largest single non-file form field. The upload route takes only a file, so
+  // this is bounded tightly: a large *field* has no legitimate use here, and
+  // busboy buffers field values in memory rather than streaming them.
+  MULTIPART_FIELD_SIZE_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(1024 * 1024)
+    .default(64 * 1024),
 
   // Worker configuration
   WORKER_INTERVAL_MS: z.coerce.number().positive().default(30000),
@@ -72,6 +95,13 @@ const schema = z.object({
   WORKER_LEASE_TIMEOUT_MS: z.coerce.number().int().positive().default(60000),
   // Maximum jobs of one kind pulled per cycle.
   WORKER_BATCH_SIZE: z.coerce.number().int().positive().max(500).default(50),
+  // How long shutdown waits for the in-flight cycle to finish before it stops
+  // waiting. Releasing a lease while its job is still submitting would let
+  // another worker claim and resubmit the same payment, so shutdown drains
+  // first. If the drain outruns this budget the leases are left to expire on
+  // their own — a job recovered late is safe, a job submitted twice is not.
+  WORKER_SHUTDOWN_DRAIN_MS: z.coerce.number().int().positive().default(30000),
+
   // Delivery attempts per webhook before the record is marked failed and never
   // retried again — see src/services/webhook.ts.
   WEBHOOK_MAX_ATTEMPTS: z.coerce.number().int().positive().max(10).default(3),
@@ -116,6 +146,25 @@ const schema = z.object({
   ANCHOR_POLL_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
   CONFIRM_POLL_MAX_ATTEMPTS: z.coerce.number().int().positive().default(10),
   CONFIRM_POLL_DELAY_MS: z.coerce.number().int().positive().default(1500),
+  // How long a completed idempotency reservation replays before it is swept.
+  // Past this window the key is free to be reused — a documented contract, not
+  // an accident: an unbounded key space is a table that only grows.
+  IDEMPOTENCY_TTL_MS: z.coerce.number().int().positive().default(24 * 60 * 60 * 1000),
+  // How long an in-progress reservation blocks a retry with 409 before it is
+  // treated as abandoned by a crashed process and may be re-claimed.
+  IDEMPOTENCY_IN_PROGRESS_TIMEOUT_MS: z.coerce.number().int().positive().default(60000),
+  // Bounded retry policy for *safe* Horizon and anchor reads — see
+  // src/services/retry.ts. Deliberately conservative: three attempts bound the
+  // worst case at roughly three timeouts plus backoff, which is short enough
+  // that a request still fails predictably during an upstream outage. Payment
+  // submission and other state-changing calls are never retried here.
+  UPSTREAM_RETRY_MAX_ATTEMPTS: z.coerce.number().int().positive().max(10).default(3),
+  UPSTREAM_RETRY_INITIAL_DELAY_MS: z.coerce.number().int().positive().default(200),
+  UPSTREAM_RETRY_MAX_DELAY_MS: z.coerce.number().int().positive().default(2000),
+  // Fraction of each backoff delay that may be removed as jitter. Without it,
+  // identical schedules across instances reconverge into synchronized bursts
+  // against an upstream that is already struggling.
+  UPSTREAM_RETRY_JITTER_RATIO: z.coerce.number().min(0).max(1).default(0.25),
   NODE_ENV: z.string().default("development"),
 
   // Security-sensitive endpoint policies.
@@ -144,6 +193,8 @@ const schema = z.object({
   RATE_LIMIT_SETTLEMENT_CREATE_WINDOW_MS: z.coerce.number().int().positive().default(60000),
   RATE_LIMIT_SETTLEMENT_CONFIRM_MAX: z.coerce.number().int().positive().max(100000).default(20),
   RATE_LIMIT_SETTLEMENT_CONFIRM_WINDOW_MS: z.coerce.number().int().positive().default(60000),
+  RATE_LIMIT_SETTLEMENT_EXECUTE_MAX: z.coerce.number().int().positive().max(100000).default(20),
+  RATE_LIMIT_SETTLEMENT_EXECUTE_WINDOW_MS: z.coerce.number().int().positive().default(60000),
   SEP24_RATE_LIMIT_MAX: z.coerce.number().int().positive().max(100000).default(10),
   SEP24_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60000),
   RATE_LIMIT_GROUP: z.coerce.number().int().positive().max(100000).default(10),
@@ -226,6 +277,10 @@ const networkPassphrase =
 
 export const config = {
   ...parsed,
+  HORIZON_ENDPOINTS: (parsed.HORIZON_URLS ?? parsed.HORIZON_URL)
+    .split(",")
+    .map((url) => url.trim())
+    .filter(Boolean),
   API_URL: parsed.API_PUBLIC_URL,
   SEP10_HOME_DOMAIN: parsed.SEP10_HOME_DOMAIN ?? apiHost,
   WEB_AUTH_DOMAIN: parsed.WEB_AUTH_DOMAIN ?? apiHost,
