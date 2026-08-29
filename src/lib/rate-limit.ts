@@ -145,7 +145,7 @@ export function rateLimitPolicies(): Record<RateLimitPolicyName, RateLimitPolicy
       timeWindow: config.RATE_LIMIT_WINDOW_MS,
       keyBy: "user-or-ip",
       prefix: "history.read",
-      hook: "preValidation",
+      hook: "preHandler",
     },
   };
 }
